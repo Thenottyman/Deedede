@@ -1,0 +1,160 @@
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+
+-- =========================
+-- REMOTE TOGGLE CHECK
+-- =========================
+local REMOTE_URL = "https://pastebin.com/raw/uvvbzp99"
+local allowRun = false
+
+pcall(function()
+    local txt = game:HttpGet(REMOTE_URL)
+    if typeof(txt) == "string" then
+        txt = string.lower(txt)
+        if string.find(txt, "yes") then
+            allowRun = true
+        end
+    end
+end)
+
+if not allowRun then
+    return
+end
+
+-- =========================
+-- SCRIPT STARTS HERE
+-- =========================
+
+local plr = Players.LocalPlayer
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "NoRespawnDesync"
+gui.ResetOnSpawn = false
+gui.Parent = plr:WaitForChild("PlayerGui")
+
+-- BUTTON
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0,200,0,40)
+button.Position = UDim2.new(0,50,0,50)
+button.BackgroundColor3 = Color3.fromRGB(40,100,40)
+button.TextColor3 = Color3.fromRGB(255,255,255)
+button.Font = Enum.Font.GothamBold
+button.TextSize = 14
+button.Text = "BLADE BALL NOTTY DESYNC"
+button.Parent = gui
+
+Instance.new("UICorner", button).CornerRadius = UDim.new(0,10)
+Instance.new("UIStroke", button).Color = Color3.fromRGB(90,160,90)
+
+-- STATUS LABEL
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0,200,0,20)
+statusLabel.Position = UDim2.new(0,50,0,95)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(150,150,150)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 12
+statusLabel.Text = "Status: Idle"
+statusLabel.Parent = gui
+
+-- PROGRESS BAR
+local barBG = Instance.new("Frame", gui)
+barBG.Position = UDim2.new(0,50,0,120)
+barBG.Size = UDim2.new(0,200,0,6)
+barBG.BackgroundColor3 = Color3.fromRGB(45,45,45)
+barBG.BorderSizePixel = 0
+Instance.new("UICorner", barBG).CornerRadius = UDim.new(1,0)
+
+local bar = Instance.new("Frame", barBG)
+bar.Size = UDim2.new(0,0,1,0)
+bar.BackgroundColor3 = Color3.fromRGB(90,200,120)
+bar.BorderSizePixel = 0
+Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
+
+-- STATUS HELPER
+local function setStatus(text, color)
+    statusLabel.Text = "Status: "..text
+    TweenService:Create(statusLabel, TweenInfo.new(0.2), {
+        TextColor3 = color
+    }):Play()
+end
+
+-- =========================
+-- DESYNC LOGIC (UNCHANGED)
+-- =========================
+
+local processing = false
+local savedCFrame = nil
+
+local function forceRespawn()
+    local char = plr.Character
+    if not char then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.Health = 0
+    else
+        char:BreakJoints()
+    end
+end
+
+local function doNoRespawnDesync()
+    if processing then return end
+    processing = true
+    setStatus("Processing", Color3.fromRGB(255,200,90))
+
+    local char = plr.Character
+    if not char then
+        setStatus("No Character", Color3.fromRGB(255,90,90))
+        processing = false
+        return
+    end
+
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then
+        setStatus("Humanoid/Root Missing", Color3.fromRGB(255,90,90))
+        processing = false
+        return
+    end
+    if hum.Health <= 0 then
+        setStatus("Dead", Color3.fromRGB(255,90,90))
+        processing = false
+        return
+    end
+
+    savedCFrame = root.CFrame
+
+    pcall(function()
+        setfflag("NextGenReplicatorEnabledWrite4","false")
+    end)
+
+    setStatus("Desyncing", Color3.fromRGB(255,120,120))
+    TweenService:Create(bar, TweenInfo.new(0.55), {
+        Size = UDim2.new(1,0,1,0)
+    }):Play()
+
+    task.wait(0.543)
+
+    pcall(function()
+        setfflag("NextGenReplicatorEnabledWrite4","true")
+    end)
+
+    task.wait(0.1)
+    root.CFrame = savedCFrame
+
+    setStatus("Desync Complete", Color3.fromRGB(90,255,120))
+    TweenService:Create(bar, TweenInfo.new(0.25), {
+        Size = UDim2.new(0,0,1,0)
+    }):Play()
+
+    -- FORCE RESPAWN (NOT RESET)
+    task.wait(0.15)
+    forceRespawn()
+
+    processing = false
+end
+
+button.MouseButton1Click:Connect(doNoRespawnDesync)
