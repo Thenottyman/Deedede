@@ -1,11 +1,12 @@
 -- Ink Game | Notty Desync
 -- One-shot No-Respawn Desync (NO TOGGLE)
 -- Premium UI + Smooth Animations
--- Client-side Invis Integrated
+-- HARD Client-Side Invis (RenderStepped)
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local plr = Players.LocalPlayer
 
 -- ================= GUI =================
@@ -27,7 +28,7 @@ local stroke = Instance.new("UIStroke", main)
 stroke.Thickness = 2
 stroke.Color = Color3.fromRGB(255,80,80)
 
--- ================= HEADER (DRAG) =================
+-- ================= HEADER =================
 local header = Instance.new("Frame")
 header.Size = UDim2.new(1,0,0,38)
 header.BackgroundColor3 = Color3.fromRGB(18,18,18)
@@ -126,30 +127,44 @@ btn.MouseLeave:Connect(function()
     tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(40,40,40)})
 end)
 
--- ================= CLIENT-SIDE INVIS =================
+-- ================= HARD CLIENT INVIS =================
 local invisEnabled = false
+local invisConn
 
-local function setInvisible(char, state)
+local function forceInvisible(char)
     for _, v in ipairs(char:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.LocalTransparencyModifier = state and 1 or 0
+        if v:IsA("BasePart") or v:IsA("MeshPart") then
+            v.Transparency = 1
+            v.LocalTransparencyModifier = 1
+            v.CastShadow = false
         elseif v:IsA("Decal") or v:IsA("Texture") then
-            v.Transparency = state and 1 or 0
+            v.Transparency = 1
         end
+    end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
     end
 end
 
-local function applyInvis()
-    if plr.Character then
-        setInvisible(plr.Character, true)
-    end
+local function enableInvis()
+    invisEnabled = true
+    if invisConn then invisConn:Disconnect() end
+
+    invisConn = RunService.RenderStepped:Connect(function()
+        local char = plr.Character
+        if char then
+            forceInvisible(char)
+        end
+    end)
 end
 
 plr.CharacterAdded:Connect(function(char)
     if invisEnabled then
         char:WaitForChild("HumanoidRootPart", 5)
-        task.wait(0.2)
-        setInvisible(char, true)
+        task.wait(0.1)
+        enableInvis()
     end
 end)
 
@@ -202,97 +217,8 @@ btn.MouseButton1Click:Connect(function()
     tween(btn, 0.15, {Size = UDim2.new(0,180,0,34)})
 
     if runNoRespawnDesync() then
-        invisEnabled = true
-        applyInvis()
+        enableInvis()
 
-        status.Text = "Status: Invis Active"
-        status.TextColor3 = Color3.fromRGB(255,90,90)
-        btn.Text = "You are invis"
-        tween(btn, 0.25, {
-            BackgroundColor3 = Color3.fromRGB(120,35,35)
-        })
-    else
-        status.Text = "Status: Failed"
-        status.TextColor3 = Color3.fromRGB(255,80,80)
-        btn.Text = "FAILED"
-        tween(btn, 0.25, {
-            BackgroundColor3 = Color3.fromRGB(80,30,30)
-        })
-    end
-end)            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-end)
-
--- ================= ANIMATIONS =================
-local function tween(obj, time, props)
-    TweenService:Create(
-        obj,
-        TweenInfo.new(time, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-        props
-    ):Play()
-end
-
--- Hover animation
-btn.MouseEnter:Connect(function()
-    tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(60,60,60)})
-end)
-
-btn.MouseLeave:Connect(function()
-    tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(40,40,40)})
-end)
-
--- ================= DESYNC LOGIC =================
-local used = false
-local savedCFrame
-
-local function runNoRespawnDesync()
-    local char = plr.Character
-    if not char then return false end
-
-    local root = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not root or not hum or hum.Health <= 0 then return false end
-
-    savedCFrame = root.CFrame
-
-    pcall(function()
-        setfflag("NextGenReplicatorEnabledWrite4","false")
-    end)
-
-    task.wait(0.543)
-
-    pcall(function()
-        setfflag("NextGenReplicatorEnabledWrite4","true")
-    end)
-
-    task.wait(0.1)
-    root.CFrame = savedCFrame
-    return true
-end
-
-plr.CharacterAdded:Connect(function(char)
-    if not used or not savedCFrame then return end
-    task.spawn(function()
-        local root = char:WaitForChild("HumanoidRootPart",5)
-        if root then
-            root.CFrame = savedCFrame
-        end
-    end)
-end)
-
--- ================= BUTTON ACTION =================
-btn.MouseButton1Click:Connect(function()
-    if used then return end
-    used = true
-
-    status.Text = "Status: Executing..."
-    status.TextColor3 = Color3.fromRGB(255,200,0)
-    tween(btn, 0.15, {Size = UDim2.new(0,180,0,34)})
-
-    if runNoRespawnDesync() then
         status.Text = "Status: Invis Active"
         status.TextColor3 = Color3.fromRGB(255,90,90)
         btn.Text = "You are invis"
