@@ -1,7 +1,8 @@
 -- Ink Game | Notty Desync
 -- One-shot No-Respawn Desync (NO TOGGLE)
 -- Premium UI + Smooth Animations
--- HARD Client-Side Invis (RenderStepped)
+-- Client Invis + Self View Toggle
+-- ORIGINAL DRAG + ORIGINAL DESYNC PRESERVED
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -16,7 +17,7 @@ gui.ResetOnSpawn = false
 gui.Parent = game:GetService("CoreGui")
 
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0,270,0,135)
+main.Size = UDim2.new(0,270,0,165)
 main.Position = UDim2.new(0,50,0,250)
 main.BackgroundColor3 = Color3.fromRGB(14,14,14)
 main.BorderSizePixel = 0
@@ -60,13 +61,27 @@ status.TextXAlignment = Enum.TextXAlignment.Left
 status.TextColor3 = Color3.fromRGB(160,160,160)
 status.Parent = main
 
+-- ================= SELF VIEW TOGGLE =================
+local selfBtn = Instance.new("TextButton")
+selfBtn.Size = UDim2.new(0,190,0,28)
+selfBtn.Position = UDim2.new(0.5,-95,0,74)
+selfBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+selfBtn.BorderSizePixel = 0
+selfBtn.Text = "SEE YOURSELF: OFF"
+selfBtn.Font = Enum.Font.GothamBold
+selfBtn.TextSize = 12
+selfBtn.TextColor3 = Color3.fromRGB(200,200,200)
+selfBtn.Visible = false
+selfBtn.Parent = main
+Instance.new("UICorner", selfBtn).CornerRadius = UDim.new(0,8)
+
 -- ================= BUTTON =================
 local btn = Instance.new("TextButton")
 btn.Size = UDim2.new(0,190,0,36)
 btn.Position = UDim2.new(0.5,-95,1,-46)
 btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
 btn.BorderSizePixel = 0
-btn.Text = "EXECUTE INVISIBILITY"
+btn.Text = "EXECUTE DESYNC"
 btn.Font = Enum.Font.GothamBold
 btn.TextSize = 13
 btn.TextColor3 = Color3.fromRGB(255,255,255)
@@ -74,11 +89,7 @@ btn.Parent = main
 btn.AutoButtonColor = false
 Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
 
-local bstroke = Instance.new("UIStroke", btn)
-bstroke.Thickness = 1
-bstroke.Color = Color3.fromRGB(255,80,80)
-
--- ================= DRAG =================
+-- ================= DRAG (ORIGINAL – UNCHANGED) =================
 local dragging, dragStart, startPos
 
 header.InputBegan:Connect(function(input)
@@ -110,30 +121,14 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
--- ================= ANIMS =================
-local function tween(obj, time, props)
-    TweenService:Create(
-        obj,
-        TweenInfo.new(time, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-        props
-    ):Play()
-end
-
-btn.MouseEnter:Connect(function()
-    tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(60,60,60)})
-end)
-
-btn.MouseLeave:Connect(function()
-    tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(40,40,40)})
-end)
-
 -- ================= HARD CLIENT INVIS =================
-local invisEnabled = false
 local invisConn
+local invisActive = false
+local selfVisible = false
 
-local function forceInvisible(char)
-    for _, v in ipairs(char:GetDescendants()) do
-        if v:IsA("BasePart") or v:IsA("MeshPart") then
+local function makeInvisible(char)
+    for _,v in ipairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then
             v.Transparency = 1
             v.LocalTransparencyModifier = 1
             v.CastShadow = false
@@ -141,34 +136,55 @@ local function forceInvisible(char)
             v.Transparency = 1
         end
     end
+end
 
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+local function makeVisible(char)
+    for _,v in ipairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Transparency = 0
+            v.LocalTransparencyModifier = 0
+            v.CastShadow = true
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 0
+        end
     end
 end
 
 local function enableInvis()
-    invisEnabled = true
     if invisConn then invisConn:Disconnect() end
-
     invisConn = RunService.RenderStepped:Connect(function()
-        local char = plr.Character
-        if char then
-            forceInvisible(char)
+        if selfVisible then return end
+        if plr.Character then
+            makeInvisible(plr.Character)
         end
     end)
 end
 
 plr.CharacterAdded:Connect(function(char)
-    if invisEnabled then
-        char:WaitForChild("HumanoidRootPart", 5)
+    if invisActive then
+        char:WaitForChild("HumanoidRootPart",5)
         task.wait(0.1)
         enableInvis()
     end
 end)
 
--- ================= DESYNC LOGIC =================
+-- ================= SELF TOGGLE =================
+selfBtn.MouseButton1Click:Connect(function()
+    selfVisible = not selfVisible
+
+    if selfVisible then
+        selfBtn.Text = "SEE YOURSELF: ON"
+        selfBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        if invisConn then invisConn:Disconnect() end
+        if plr.Character then makeVisible(plr.Character) end
+    else
+        selfBtn.Text = "SEE YOURSELF: OFF"
+        selfBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+        enableInvis()
+    end
+end)
+
+-- ================= DESYNC LOGIC (ORIGINAL – UNCHANGED) =================
 local used = false
 local savedCFrame
 
@@ -214,23 +230,19 @@ btn.MouseButton1Click:Connect(function()
 
     status.Text = "Status: Executing..."
     status.TextColor3 = Color3.fromRGB(255,200,0)
-    tween(btn, 0.15, {Size = UDim2.new(0,180,0,34)})
 
     if runNoRespawnDesync() then
+        invisActive = true
         enableInvis()
+        selfBtn.Visible = true
 
         status.Text = "Status: Invis Active"
         status.TextColor3 = Color3.fromRGB(255,90,90)
         btn.Text = "You are invis"
-        tween(btn, 0.25, {
-            BackgroundColor3 = Color3.fromRGB(120,35,35)
-        })
+        btn.BackgroundColor3 = Color3.fromRGB(120,35,35)
     else
         status.Text = "Status: Failed"
         status.TextColor3 = Color3.fromRGB(255,80,80)
         btn.Text = "FAILED"
-        tween(btn, 0.25, {
-            BackgroundColor3 = Color3.fromRGB(80,30,30)
-        })
     end
 end)
