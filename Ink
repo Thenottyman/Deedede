@@ -9,7 +9,7 @@ local plr = Players.LocalPlayer
 
 -- ================= GUI =================
 local gui = Instance.new("ScreenGui")
-gui.Name = "InkGameNottyDesync"
+gui.Name = "InkGameNottyInvis"
 gui.ResetOnSpawn = false
 gui.Parent = game:GetService("CoreGui")
 
@@ -41,7 +41,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,-14,1,0)
 title.Position = UDim2.new(0,14,0,0)
 title.BackgroundTransparency = 1
-title.Text = "INK GAME — NOTTY DESYNC"
+title.Text = "INK GAME — NOTTY INVIS"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 13
 title.TextXAlignment = Enum.TextXAlignment.Left
@@ -147,7 +147,7 @@ local function runNoRespawnDesync()
         setfflag("NextGenReplicatorEnabledWrite4","false")
     end)
 
-    task.wait(0.55)
+    task.wait(0.543)
 
     pcall(function()
         setfflag("NextGenReplicatorEnabledWrite4","true")
@@ -178,9 +178,9 @@ btn.MouseButton1Click:Connect(function()
     tween(btn, 0.15, {Size = UDim2.new(0,180,0,34)})
 
     if runNoRespawnDesync() then
-        status.Text = "Status: Desync Active"
+        status.Text = "Status: Invis Active"
         status.TextColor3 = Color3.fromRGB(255,90,90)
-        btn.Text = "DESYNCED"
+        btn.Text = "You are invis"
         tween(btn, 0.25, {
             BackgroundColor3 = Color3.fromRGB(120,35,35)
         })
