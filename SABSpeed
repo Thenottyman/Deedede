@@ -1,7 +1,7 @@
 -- NOTTY HUB LAG 1.0
 -- Features: Ping Lagger (E) + Speed Boost to 60 (F) + Dark Sky Blue Theme
 -- Toggle UI with U
--- Anti-Respawn & Position Lock System
+-- Position Lock System
 -- Mobile-Friendly Speed & Data Payload Sliders
 
 local UserInputService = game:GetService("UserInputService")
@@ -22,8 +22,6 @@ local isRemoteSupported = false
 
 -- Position locking variables
 local savedPosition = nil
-local savedCharacter = nil
-local antiRespawnActive = true
 
 -- Dark Sky Blue theme colors
 local COLOR_BG_DARK = Color3.fromRGB(35, 50, 65)
@@ -269,8 +267,8 @@ local function updateSpeedUI()
     end
 end
 
--- Update speed slider visuals
-local function updateSpeedSlider()
+-- Update slider visuals
+local function updateSlider()
     local minSpeed = 16
     local maxSpeed = 120
     local percentage = (boostedWalkSpeed - minSpeed) / (maxSpeed - minSpeed)
@@ -280,7 +278,7 @@ local function updateSpeedSlider()
     speedLabel.Text = "Speed: " .. math.floor(boostedWalkSpeed)
 end
 
--- Update payload slider visuals
+-- Update payload slider
 local function updatePayloadSlider()
     local minPayload = 1000
     local maxPayload = 10000
@@ -319,7 +317,12 @@ speedSliderBG.InputChanged:Connect(function(input)
         local maxSpeed = 120
         boostedWalkSpeed = minSpeed + (percentage * (maxSpeed - minSpeed))
         
-        updateSpeedSlider()
+        updateSlider()
+        
+        -- Apply speed immediately if enabled
+        if speedBoostEnabled then
+            applySpeed()
+        end
     end
 end)
 
@@ -333,7 +336,11 @@ UserInputService.InputChanged:Connect(function(input)
         local maxSpeed = 120
         boostedWalkSpeed = minSpeed + (percentage * (maxSpeed - minSpeed))
         
-        updateSpeedSlider()
+        updateSlider()
+        
+        if speedBoostEnabled then
+            applySpeed()
+        end
     end
 end)
 
@@ -380,419 +387,11 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- ANTI-RESPAWN SYSTEM
-local function setupAntiRespawn()
-    player.CharacterAdded:Connect(function(newChar)
-        if antiRespawnActive and savedCharacter and savedCharacter.Parent then
-            newChar:Destroy()
-            print("NOTTY HUB: Blocked respawn attempt")
-            
-            if not savedCharacter.Parent then
-                savedCharacter.Parent = workspace
-            end
-            
-            if savedPosition and savedCharacter:FindFirstChild("HumanoidRootPart") then
-                savedCharacter.HumanoidRootPart.CFrame = savedPosition
-            end
-        else
-            savedCharacter = newChar
-        end
-    end)
-    
-    if player.Character then
-        savedCharacter = player.Character
-        
-        player.Character.AncestryChanged:Connect(function(child, parent)
-            if antiRespawnActive and not parent and savedCharacter then
-                task.wait(0.1)
-                if savedCharacter and not savedCharacter.Parent then
-                    savedCharacter.Parent = workspace
-                    
-                    if savedPosition and savedCharacter:FindFirstChild("HumanoidRootPart") then
-                        savedCharacter.HumanoidRootPart.CFrame = savedPosition
-                    end
-                    print("NOTTY HUB: Restored character")
-                end
-            end
-        end)
-    end
-end
-
 -- Position saver
 task.spawn(function()
     while true do
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             savedPosition = player.Character.HumanoidRootPart.CFrame
-            savedCharacter = player.Character
-        end
-        task.wait(0.1)
-    end
-end)
-
--- NEW AGGRESSIVE SPEED BOOST (AssemblyLinearVelocity method)
-local speedConnection = nil
-
-local function enableSpeedBoost()
-    if speedConnection then
-        speedConnection:Disconnect()
-        speedConnection = nil
-    end
-    
-    speedConnection = RunService.Heartbeat:Connect(function(deltaTime)
-        if not speedBoostEnabled then return end
-        
-        local character = player.Character
-        if not character then return end
-        
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        
-        if not humanoid or not humanoidRootPart then return end
-        
-        local moveDir = humanoid.MoveDirection
-        
-        if moveDir.Magnitude > 0 then
-            -- Aggressive velocity-based speed (ignores walkspeed cap)
-            humanoidRootPart.AssemblyLinearVelocity = Vector3.new(
-                moveDir.X * boostedWalkSpeed,
-                humanoidRootPart.AssemblyLinearVelocity.Y,  -- preserve Y (jump/fall)
-                moveDir.Z * boostedWalkSpeed
-            )
-        end
-    end)
-end
-
-local function disableSpeedBoost()
-    if speedConnection then
-        speedConnection:Disconnect()
-        speedConnection = nil
-    end
-end
-
-player.CharacterAdded:Connect(function(char)
-    wait(0.5)
-    if speedBoostEnabled then
-        enableSpeedBoost()
-    end
-end)
-
--- Position lock
-local function lockPositionOnLagStop()
-    if savedPosition and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = player.Character.HumanoidRootPart
-        hrp.CFrame = savedPosition
-        hrp.Anchored = true
-        
-        task.wait(0.5)
-        
-        if hrp and hrp.Parent then
-            hrp.Anchored = false
-        end
-        
-        print("NOTTY HUB: Position locked, lagback prevented")
-    end
-end
-
--- Button / Keybinds
-lagBtn.MouseButton1Click:Connect(function()
-    lagModeEnabled = not lagModeEnabled
-    updateLagUI()
-    
-    if not lagModeEnabled then
-        lockPositionOnLagStop()
-    end
-end)
-
-speedBtn.MouseButton1Click:Connect(function()
-    speedBoostEnabled = not speedBoostEnabled
-    updateSpeedUI()
-    
-    if speedBoostEnabled then
-        enableSpeedBoost()
-    else
-        disableSpeedBoost()
-    end
-end)
-
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Enum.KeyCode.E then
-        lagModeEnabled = not lagModeEnabled
-        updateLagUI()
-        
-        if not lagModeEnabled then
-            lockPositionOnLagStop()
-        end
-    elseif input.KeyCode == Enum.KeyCode.F then
-        speedBoostEnabled = not speedBoostEnabled
-        updateSpeedUI()
-        
-        if speedBoostEnabled then
-            enableSpeedBoost()
-        else
-            disableSpeedBoost()
-        end
-    elseif input.KeyCode == Enum.KeyCode.U then
-        frame.Visible = not frame.Visible
-    end
-end)
-
--- Initial setup
-if player.Character then 
-    savedCharacter = player.Character
-end
-
-setupAntiRespawn()
-updateSpeedSlider()
-updatePayloadSlider()
-
--- Lag spam loop
-task.spawn(function()
-    while true do
-        if lagModeEnabled and remoteEventTarget then
-            for i = 1, 6 do
-                task.delay(math.random(1,5)/200, function()
-                    pcall(function()
-                        remoteEventTarget:FireServer(uniqueIdentifier, dataPayload)
-                    end)
-                end)
-            end
-            task.wait(0.12)
-        else
-            task.wait(0.2)
-        end
-    end
-end)
-
--- Draggable (title bar only)
-local dragging, dragStart, startPos
-titleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
-print("NOTTY HUB LAG SPEED BOOST PREMIUM")remoteLabel.Text = remoteEventTarget and "Target: " .. remoteEventTarget.Name or "No Remote Found"
-remoteLabel.TextColor3 = remoteEventTarget and COLOR_GREEN or COLOR_RED
-remoteLabel.Font = Enum.Font.Gotham
-remoteLabel.TextSize = 13
-remoteLabel.TextXAlignment = Enum.TextXAlignment.Left
-remoteLabel.Parent = frame
-
--- Lag Button
-local lagBtn = Instance.new("TextButton")
-lagBtn.Size = UDim2.new(1, -20, 0, 50)
-lagBtn.Position = UDim2.new(0, 10, 0, 90)
-lagBtn.BackgroundColor3 = COLOR_RED
-lagBtn.Text = "START LAG (E)"
-lagBtn.TextColor3 = Color3.new(1,1,1)
-lagBtn.Font = Enum.Font.GothamBold
-lagBtn.TextSize = 16
-lagBtn.Parent = frame
-local lagCorner = Instance.new("UICorner"); lagCorner.CornerRadius = UDim.new(0, 10); lagCorner.Parent = lagBtn
-
--- Speed Button
-local speedBtn = Instance.new("TextButton")
-speedBtn.Size = UDim2.new(1, -20, 0, 50)
-speedBtn.Position = UDim2.new(0, 10, 0, 150)
-speedBtn.BackgroundColor3 = COLOR_ACCENT_OFF
-speedBtn.Text = "SPEED BOOST OFF (F)"
-speedBtn.TextColor3 = Color3.new(1,1,1)
-speedBtn.Font = Enum.Font.GothamBold
-speedBtn.TextSize = 16
-speedBtn.Parent = frame
-local speedCorner = Instance.new("UICorner"); speedCorner.CornerRadius = UDim.new(0, 10); speedCorner.Parent = speedBtn
-
--- Speed Slider Label
-local speedLabel = Instance.new("TextLabel")
-speedLabel.Size = UDim2.new(1, -20, 0, 20)
-speedLabel.Position = UDim2.new(0, 10, 0, 210)
-speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "Speed: " .. boostedWalkSpeed
-speedLabel.TextColor3 = COLOR_TEXT
-speedLabel.Font = Enum.Font.GothamBold
-speedLabel.TextSize = 14
-speedLabel.TextXAlignment = Enum.TextXAlignment.Center
-speedLabel.Parent = frame
-
--- Slider Background
-local sliderBG = Instance.new("Frame")
-sliderBG.Size = UDim2.new(1, -20, 0, 30)
-sliderBG.Position = UDim2.new(0, 10, 0, 235)
-sliderBG.BackgroundColor3 = Color3.fromRGB(20, 30, 40)
-sliderBG.BorderSizePixel = 0
-sliderBG.Parent = frame
-local sliderBGCorner = Instance.new("UICorner"); sliderBGCorner.CornerRadius = UDim.new(0, 8); sliderBGCorner.Parent = sliderBG
-
--- Slider Fill (the moving part)
-local sliderFill = Instance.new("Frame")
-sliderFill.Size = UDim2.new(0.5, 0, 1, 0) -- 50% = speed 60 out of 120 max
-sliderFill.BackgroundColor3 = COLOR_ACCENT
-sliderFill.BorderSizePixel = 0
-sliderFill.Parent = sliderBG
-local sliderFillCorner = Instance.new("UICorner"); sliderFillCorner.CornerRadius = UDim.new(0, 8); sliderFillCorner.Parent = sliderFill
-
--- Slider Knob
-local sliderKnob = Instance.new("Frame")
-sliderKnob.Size = UDim2.new(0, 20, 1, 0)
-sliderKnob.Position = UDim2.new(0.5, -10, 0, 0)
-sliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-sliderKnob.BorderSizePixel = 0
-sliderKnob.Parent = sliderBG
-local sliderKnobCorner = Instance.new("UICorner"); sliderKnobCorner.CornerRadius = UDim.new(0, 10); sliderKnobCorner.Parent = sliderKnob
-
--- Info
-local infoLabel = Instance.new("TextLabel")
-infoLabel.Size = UDim2.new(1, -20, 0, 20)
-infoLabel.Position = UDim2.new(0, 10, 1, -30)
-infoLabel.BackgroundTransparency = 1
-infoLabel.Text = "E = Lag | F = Speed | U = Hide UI"
-infoLabel.TextColor3 = COLOR_TEXT_DIM
-infoLabel.Font = Enum.Font.Gotham
-infoLabel.TextSize = 12
-infoLabel.Parent = frame
-
--- Update UI
-local function updateLagUI()
-    if lagModeEnabled then
-        lagBtn.Text = "STOP LAG (E)"
-        lagBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 140)
-    else
-        lagBtn.Text = "START LAG (E)"
-        lagBtn.BackgroundColor3 = COLOR_RED
-    end
-end
-
-local function updateSpeedUI()
-    if speedBoostEnabled then
-        speedBtn.Text = "SPEED BOOST ON (F)"
-        speedBtn.BackgroundColor3 = COLOR_ACCENT
-    else
-        speedBtn.Text = "SPEED BOOST OFF (F)"
-        speedBtn.BackgroundColor3 = COLOR_ACCENT_OFF
-    end
-end
-
--- Update slider visuals
-local function updateSlider()
-    local minSpeed = 16
-    local maxSpeed = 120
-    local percentage = (boostedWalkSpeed - minSpeed) / (maxSpeed - minSpeed)
-    
-    sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
-    sliderKnob.Position = UDim2.new(percentage, -10, 0, 0)
-    speedLabel.Text = "Speed: " .. math.floor(boostedWalkSpeed)
-end
-
--- Slider dragging logic (works on mobile & PC)
-local draggingSlider = false
-
-sliderBG.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingSlider = true
-    end
-end)
-
-sliderBG.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingSlider = false
-    end
-end)
-
-sliderBG.InputChanged:Connect(function(input)
-    if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local sliderSize = sliderBG.AbsoluteSize.X
-        local relativeX = input.Position.X - sliderBG.AbsolutePosition.X
-        local percentage = math.clamp(relativeX / sliderSize, 0, 1)
-        
-        local minSpeed = 16
-        local maxSpeed = 120
-        boostedWalkSpeed = minSpeed + (percentage * (maxSpeed - minSpeed))
-        
-        updateSlider()
-        
-        -- Apply speed immediately if enabled
-        if speedBoostEnabled then
-            applySpeed()
-        end
-    end
-end)
-
--- Also handle direct click/tap on slider
-UserInputService.InputChanged:Connect(function(input)
-    if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local sliderSize = sliderBG.AbsoluteSize.X
-        local relativeX = input.Position.X - sliderBG.AbsolutePosition.X
-        local percentage = math.clamp(relativeX / sliderSize, 0, 1)
-        
-        local minSpeed = 16
-        local maxSpeed = 120
-        boostedWalkSpeed = minSpeed + (percentage * (maxSpeed - minSpeed))
-        
-        updateSlider()
-        
-        if speedBoostEnabled then
-            applySpeed()
-        end
-    end
-end)
-
--- ANTI-RESPAWN SYSTEM
-local function setupAntiRespawn()
-    player.CharacterAdded:Connect(function(newChar)
-        if antiRespawnActive and savedCharacter and savedCharacter.Parent then
-            newChar:Destroy()
-            print("NOTTY HUB: Blocked respawn attempt")
-            
-            if not savedCharacter.Parent then
-                savedCharacter.Parent = workspace
-            end
-            
-            if savedPosition and savedCharacter:FindFirstChild("HumanoidRootPart") then
-                savedCharacter.HumanoidRootPart.CFrame = savedPosition
-            end
-        else
-            savedCharacter = newChar
-        end
-    end)
-    
-    if player.Character then
-        savedCharacter = player.Character
-        
-        player.Character.AncestryChanged:Connect(function(child, parent)
-            if antiRespawnActive and not parent and savedCharacter then
-                task.wait(0.1)
-                if savedCharacter and not savedCharacter.Parent then
-                    savedCharacter.Parent = workspace
-                    
-                    if savedPosition and savedCharacter:FindFirstChild("HumanoidRootPart") then
-                        savedCharacter.HumanoidRootPart.CFrame = savedPosition
-                    end
-                    print("NOTTY HUB: Restored character")
-                end
-            end
-        end)
-    end
-end
-
--- Position saver
-task.spawn(function()
-    while true do
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            savedPosition = player.Character.HumanoidRootPart.CFrame
-            savedCharacter = player.Character
         end
         task.wait(0.1)
     end
@@ -884,12 +483,11 @@ end)
 
 -- Initial setup
 if player.Character then 
-    savedCharacter = player.Character
     applySpeed()
 end
 
-setupAntiRespawn()
 updateSlider()
+updatePayloadSlider()
 
 -- Lag spam loop
 task.spawn(function()
@@ -929,4 +527,4 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
-print("NOTTY HUB LAG 1.0 | Mobile-Friendly Speed Slider | Anti-Respawn Active")
+print("NOTTY HUB LAG 1.0 | Mobile-Friendly Speed Slider | Position Lock Active")
