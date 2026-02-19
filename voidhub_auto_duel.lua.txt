@@ -1,0 +1,405 @@
+-- VoidHub Auto Duel - Purple Theme
+-- Discord: https://discord.gg/NGEMSasjjG
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local waypoints = {}
+local currentWaypoint = 1
+local moving = false
+local connection
+local speedConnection
+local isWaitingForGrab = false
+local grabDetectedThisSession = false
+
+-- VoidHub Purple Theme Colors
+local COLOR_BG = Color3.fromRGB(10, 7, 15)
+local COLOR_PANEL = Color3.fromRGB(18, 13, 25)
+local COLOR_ACCENT = Color3.fromRGB(139, 92, 246)
+local COLOR_ACCENT2 = Color3.fromRGB(167, 139, 250)
+local COLOR_TEXT = Color3.fromRGB(255, 255, 255)
+local COLOR_TEXT_DIM = Color3.fromRGB(148, 163, 184)
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "VoidHubAutoDuel"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 240, 0, 210)
+main.Position = UDim2.new(1, -260, 0.5, -105)
+main.BackgroundColor3 = COLOR_BG
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
+
+-- Purple Neon Snake Border
+local borderStroke = Instance.new("UIStroke")
+borderStroke.Parent = main
+borderStroke.Thickness = 3
+borderStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+borderStroke.LineJoinMode = Enum.LineJoinMode.Round
+borderStroke.Transparency = 0
+
+local snakeGradient = Instance.new("UIGradient")
+snakeGradient.Parent = borderStroke
+snakeGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 92, 246)),
+    ColorSequenceKeypoint.new(0.25, Color3.fromRGB(200, 150, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(139, 92, 246)),
+    ColorSequenceKeypoint.new(0.75, Color3.fromRGB(88, 28, 135)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 92, 246))
+}
+
+task.spawn(function()
+    local rotation = 0
+    while true do
+        rotation = (rotation + 3) % 360
+        snakeGradient.Rotation = rotation
+        task.wait(0.02)
+    end
+end)
+
+-- Glow border
+local glowStroke = Instance.new("UIStroke")
+glowStroke.Parent = main
+glowStroke.Thickness = 6
+glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+glowStroke.Transparency = 0.7
+glowStroke.Color = COLOR_ACCENT
+
+local glowGradient = Instance.new("UIGradient")
+glowGradient.Parent = glowStroke
+glowGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 92, 246)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 92, 246))
+}
+
+task.spawn(function()
+    local rotation = 0
+    while true do
+        rotation = (rotation + 2) % 360
+        glowGradient.Rotation = rotation
+        task.wait(0.03)
+    end
+end)
+
+-- Floating particles
+local particleContainer = Instance.new("Frame")
+particleContainer.Size = UDim2.new(1, 0, 1, 0)
+particleContainer.BackgroundTransparency = 1
+particleContainer.ClipsDescendants = true
+particleContainer.ZIndex = 1
+particleContainer.Parent = main
+
+task.spawn(function()
+    while true do
+        for i = 1, 3 do
+            local particle = Instance.new("Frame")
+            particle.Size = UDim2.new(0, math.random(2, 4), 0, math.random(2, 4))
+            particle.Position = UDim2.new(math.random(0, 100) / 100, 0, 0, -10)
+            local colors = {
+                Color3.fromRGB(255, 255, 255),
+                Color3.fromRGB(200, 150, 255),
+                Color3.fromRGB(167, 139, 250),
+                Color3.fromRGB(139, 92, 246)
+            }
+            particle.BackgroundColor3 = colors[math.random(1, #colors)]
+            particle.BorderSizePixel = 0
+            particle.ZIndex = 1
+            particle.Parent = particleContainer
+            local particleCorner = Instance.new("UICorner")
+            particleCorner.CornerRadius = UDim.new(1, 0)
+            particleCorner.Parent = particle
+            local duration = math.random(10, 18) / 10
+            TweenService:Create(particle, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
+                Position = UDim2.new(particle.Position.X.Scale, 0, 1, 20),
+                BackgroundTransparency = 1
+            }):Play()
+            task.delay(duration, function() particle:Destroy() end)
+        end
+        task.wait(0.15)
+    end
+end)
+
+-- Header
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 45)
+header.BackgroundColor3 = COLOR_PANEL
+header.BorderSizePixel = 0
+header.ZIndex = 2
+header.Parent = main
+Instance.new("UICorner", header).CornerRadius = UDim.new(0, 10)
+
+local headerFix = Instance.new("Frame")
+headerFix.Size = UDim2.new(1, 0, 0, 14)
+headerFix.Position = UDim2.new(0, 0, 1, -14)
+headerFix.BackgroundColor3 = COLOR_PANEL
+headerFix.BorderSizePixel = 0
+headerFix.ZIndex = 2
+headerFix.Parent = header
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -75, 1, 0)
+title.Position = UDim2.new(0, 12, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "VOIDHUB AUTO DUEL"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 13
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextColor3 = COLOR_TEXT
+title.ZIndex = 2
+title.Active = true
+title.Parent = header
+
+local titleGradient = Instance.new("UIGradient")
+titleGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, COLOR_ACCENT2),
+    ColorSequenceKeypoint.new(0.5, COLOR_ACCENT),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(217, 70, 239))
+}
+titleGradient.Parent = title
+
+task.spawn(function()
+    while true do
+        TweenService:Create(titleGradient, TweenInfo.new(4, Enum.EasingStyle.Linear), {Rotation = titleGradient.Rotation + 360}):Play()
+        task.wait(4)
+    end
+end)
+
+-- Discord Button
+local discordBtn = Instance.new("TextButton")
+discordBtn.Name = "DiscordBtn"
+discordBtn.Size = UDim2.new(0, 55, 0, 22)
+discordBtn.Position = UDim2.new(1, -65, 0.5, -11)
+discordBtn.BackgroundColor3 = COLOR_ACCENT
+discordBtn.Text = "Discord"
+discordBtn.Font = Enum.Font.GothamBold
+discordBtn.TextSize = 10
+discordBtn.TextColor3 = COLOR_TEXT
+discordBtn.ZIndex = 2
+discordBtn.Parent = header
+Instance.new("UICorner", discordBtn).CornerRadius = UDim.new(0, 6)
+
+discordBtn.MouseButton1Click:Connect(function()
+    local url = "https://discord.gg/NGEMSasjjG"
+    if setclipboard then
+        setclipboard(url)
+        local oldText = discordBtn.Text
+        discordBtn.Text = "Copied!"
+        discordBtn.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
+        task.wait(2)
+        discordBtn.Text = oldText
+        discordBtn.BackgroundColor3 = COLOR_ACCENT
+    end
+end)
+
+-- Drag support via title
+local dragToggle, dragStart, startPos
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragToggle = true
+        dragStart = input.Position
+        startPos = main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragToggle = false end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Speed Container
+local speedContainer = Instance.new("Frame")
+speedContainer.Size = UDim2.new(1, -30, 0, 38)
+speedContainer.Position = UDim2.new(0, 15, 0, 60)
+speedContainer.BackgroundColor3 = COLOR_PANEL
+speedContainer.ZIndex = 2
+speedContainer.Parent = main
+Instance.new("UICorner", speedContainer).CornerRadius = UDim.new(0, 8)
+
+local speedStroke = Instance.new("UIStroke", speedContainer)
+speedStroke.Color = COLOR_ACCENT
+speedStroke.Thickness = 1
+speedStroke.Transparency = 0.6
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(1, -16, 1, 0)
+speedLabel.Position = UDim2.new(0, 8, 0, 0)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text = "--"
+speedLabel.Font = Enum.Font.GothamSemibold
+speedLabel.TextSize = 13
+speedLabel.TextColor3 = COLOR_TEXT_DIM
+speedLabel.ZIndex = 2
+speedLabel.Parent = speedContainer
+
+-- Status Container
+local statusContainer = Instance.new("Frame")
+statusContainer.Size = UDim2.new(1, -30, 0, 38)
+statusContainer.Position = UDim2.new(0, 15, 0, 108)
+statusContainer.BackgroundColor3 = COLOR_PANEL
+statusContainer.ZIndex = 2
+statusContainer.Parent = main
+Instance.new("UICorner", statusContainer).CornerRadius = UDim.new(0, 8)
+
+local statusStroke = Instance.new("UIStroke", statusContainer)
+statusStroke.Color = COLOR_ACCENT
+statusStroke.Thickness = 1
+statusStroke.Transparency = 0.6
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -16, 1, 0)
+statusLabel.Position = UDim2.new(0, 8, 0, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Ready"
+statusLabel.Font = Enum.Font.GothamSemibold
+statusLabel.TextSize = 12
+statusLabel.TextColor3 = COLOR_ACCENT2
+statusLabel.ZIndex = 2
+statusLabel.Parent = statusContainer
+
+-- Start Button
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(1, -30, 0, 42)
+button.Position = UDim2.new(0, 15, 0, 158)
+button.BackgroundColor3 = COLOR_ACCENT
+button.Text = "START AUTO DUEL"
+button.Font = Enum.Font.GothamBold
+button.TextSize = 13
+button.TextColor3 = COLOR_TEXT
+button.ZIndex = 2
+button.Parent = main
+Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
+
+local btnGlow = Instance.new("UIStroke", button)
+btnGlow.Color = COLOR_ACCENT2
+btnGlow.Thickness = 1
+btnGlow.Transparency = 0.3
+
+-- Entrance animation
+main.Size = UDim2.new(0, 0, 0, 0)
+main.Position = UDim2.new(0.5, 0, 0.5, 0)
+TweenService:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = UDim2.new(0, 240, 0, 210),
+    Position = UDim2.new(1, -260, 0.5, -105)
+}):Play()
+
+-- Logic (unchanged from original)
+local function stopMoving()
+    if connection then connection:Disconnect() end
+    moving = false
+    isWaitingForGrab = false
+    grabDetectedThisSession = false
+    button.Text = "START AUTO DUEL"
+    button.BackgroundColor3 = COLOR_ACCENT
+    if statusLabel.Text ~= "FINISHED!" then
+        statusLabel.Text = "Ready"
+        statusLabel.TextColor3 = COLOR_ACCENT2
+    end
+end
+
+speedConnection = RunService.Heartbeat:Connect(function()
+    local char = player.Character
+    local hum = char and char:FindFirstChild("Humanoid")
+    if hum then
+        speedLabel.Text = "Speed: "..tostring(math.floor(hum.WalkSpeed))
+        if hum.WalkSpeed < 23 then
+            speedLabel.TextColor3 = Color3.fromRGB(237, 66, 69)
+            if isWaitingForGrab and not grabDetectedThisSession then
+                task.wait(0.3)
+                isWaitingForGrab = false
+                grabDetectedThisSession = true
+                statusLabel.Text = "Arrived at: "..currentWaypoint
+                statusLabel.TextColor3 = COLOR_ACCENT2
+            end
+        else
+            speedLabel.TextColor3 = COLOR_ACCENT2
+        end
+    end
+end)
+
+local function moveToWaypoint()
+    if connection then connection:Disconnect() end
+    connection = RunService.Stepped:Connect(function()
+        if not moving or isWaitingForGrab then return end
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        local wp = waypoints[currentWaypoint]
+        local dist = (root.Position - wp.position).Magnitude
+        if dist < 5 then
+            if (currentWaypoint == 4 or currentWaypoint == 6) and not grabDetectedThisSession then
+                isWaitingForGrab = true
+                statusLabel.Text = "Grab the pet please..."
+                statusLabel.TextColor3 = Color3.fromRGB(250, 166, 26)
+                root.Velocity = Vector3.zero
+                return
+            end
+            if currentWaypoint == #waypoints then
+                statusLabel.Text = "FINISHED!"
+                statusLabel.TextColor3 = Color3.fromRGB(34, 197, 94)
+                stopMoving()
+                return
+            end
+            currentWaypoint += 1
+            statusLabel.Text = "Arrived at: "..currentWaypoint
+        else
+            local dir = (wp.position - root.Position).Unit
+            root.Velocity = Vector3.new(dir.X * wp.speed, root.Velocity.Y, dir.Z * wp.speed)
+        end
+    end)
+end
+
+local function startDuel()
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    moving = true
+    grabDetectedThisSession = false
+    button.Text = "STOP AUTO DUEL"
+    button.BackgroundColor3 = Color3.fromRGB(220, 38, 38)
+    if (root.Position - Vector3.new(-475,-7,96)).Magnitude > (root.Position - Vector3.new(-474,-7,23)).Magnitude then
+        waypoints = {
+            {position = Vector3.new(-475,-7,96), speed=59},
+            {position = Vector3.new(-483,-5,95), speed=59},
+            {position = Vector3.new(-487,-5,95), speed=55},
+            {position = Vector3.new(-492,-5,95), speed=55},
+            {position = Vector3.new(-473,-7,95), speed=29},
+            {position = Vector3.new(-473,-7,11), speed=29}
+        }
+    else
+        waypoints = {
+            {position = Vector3.new(-474,-7,23), speed=55},
+            {position = Vector3.new(-484,-5,24), speed=55},
+            {position = Vector3.new(-488,-5,24), speed=55},
+            {position = Vector3.new(-493,-5,25), speed=55},
+            {position = Vector3.new(-473,-7,25), speed=29},
+            {position = Vector3.new(-474,-7,112), speed=29}
+        }
+    end
+    currentWaypoint = 1
+    moveToWaypoint()
+end
+
+button.MouseButton1Click:Connect(function()
+    if moving or isWaitingForGrab then
+        stopMoving()
+    else
+        startDuel()
+    end
+end)
+
+print("✨ VOIDHUB AUTO DUEL LOADED")
+print("🔗 Discord: https://discord.gg/NGEMSasjjG")
